@@ -68,7 +68,7 @@ render: function(nextElement, container, callback) {
   callback,
 ){
      /*...*/
-     //TopLevelWrapper:
+     //The most important code
      var nextWrappedElement = React.createElement(TopLevelWrapper, {
       child: nextElement,
     });
@@ -126,3 +126,47 @@ render: function(nextElement, container, callback) {
     return component;
 }
 ```
+#### *React.createElement*
+在_renderSubtreeIntoContainer中我们发现最重要的当属React.createElement，接下来我们来看看React.creactElement是如何运作的。
+我们找到[React.js](../../isomorphic/React.js)中React.[createElement](../../isomorphic/React.js#L56)的[源代码](../../isomorphic/classic/element/ReactElement.js#L183)
+```javascript
+ReactElement.createElement = function(type, config, children) {
+     //...从config提取一些参数如key，ref，self，source，props
+     //...我们可以传入两个以上参数，ReactElement.createElement将它添加到props.children
+     return ReactElement(
+       type,
+       key,
+       ref,
+       self,
+       source,
+       ReactCurrentOwner.current,
+       props,
+     );
+     //最后return 出来一个 ReactElement
+}
+
+var ReactElement = function(type, key, ref, self, source, owner, props) {
+  var element = {
+    // This tag allow us to uniquely identify this as a React Element
+    $$typeof: REACT_ELEMENT_TYPE,、
+    // Built-in properties that belong on the element
+    type: type,
+    key: key,
+    ref: ref,
+    props: props,
+    // Record the component responsible for creating this element.
+    _owner: owner,
+  };
+  return element;
+};
+//到这里我们就已经清楚组件渲染过程了
+
+//对照_renderSubtreeIntoContainer中相关参数
+//TopLevelWrapper：store all top-level pending updates on composites
+/*var nextWrappedElement = React.createElement(TopLevelWrapper, {
+child: nextElement,
+});*/
+
+```
+#### 稍微小结一下render
+ReactDOM.render(<App/>, document.querySelector('.container'));通过不断调用  _renderSubtreeIntoContainer方法,把<App />中一层层剥开通过ReactElemen处理返回的element，最终由_renderNewRootComponent渲染到DOM。
