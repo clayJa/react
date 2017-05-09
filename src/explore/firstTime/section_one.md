@@ -169,4 +169,76 @@ child: nextElement,
 
 ```
 #### 稍微小结一下render
-ReactDOM.render(<App/>, document.querySelector('.container'));通过不断调用  _renderSubtreeIntoContainer方法,把<App />中一层层剥开通过ReactElemen处理返回的element，最终由_renderNewRootComponent渲染到DOM。
+ReactDOM.render(<App/>, document.querySelector('.container'));通过不断调用  _renderSubtreeIntoContainer方法,把<App />中一层层剥开通过ReactElemen处理返回的element，最终由_renderNewRootComponent渲染到DOM。_
+#### 还没有结束
+那么_renderNewRootComponent是如何将ReactElement对象渲染到DOM的呢？
+在_renderNewRootComponent中我们发现比较重要的代码：[var componentInstance = instantiateReactComponent(nextElement, false);](../../renderers/dom/stack/client//ReactMount.js#L388)
+自然我们找到了[instantiateReactComponent](../../renderers/shared/stack/reconciler/instantiateReactComponent.js)
+我们摘取比较重要的代码
+```javascript
+function instantiateReactComponent(node, shouldHaveDebugID) {
+  var instance;
+  if (node === null || node === false) {
+   //...
+  } else if (typeof node === 'object') {
+    var element = node;
+    var type = element.type;
+    if (typeof type !== 'function' && typeof type !== 'string') {
+      var info = '';     
+    // Special case string values
+    if (typeof element.type === 'string') {
+      instance = ReactHostComponent.createInternalComponent(element);
+    } else if (isInternalComponentType(element.type)) {
+      // This is temporarily available for custom components that are not string
+      // representations. I.e. ART. Once those are updated to use the string
+      // representation, we can drop this code path.
+      instance = new element.type(element);
+
+      // We renamed this. Allow the old name for compat. :(
+      if (!instance.getHostNode) {
+        instance.getHostNode = instance.getNativeNode;
+      }
+    } else {
+      instance = new ReactCompositeComponentWrapper(element);
+    }
+  } else if (typeof node === 'string' || typeof node === 'number') {
+    instance = ReactHostComponent.createInstanceForText(node);
+  } else {
+    invariant(false, 'Encountered invalid React node of type %s', typeof node);
+  }
+  return instance;
+}
+```
+这里的element 就是 ReactElement 对象，然后找到 [ReactDOMComponent](../../renderers/dom/stack/client/ReactDOMComponent.js)，从而我们得到了ReactDOM对象
+接着，调用 ReactUpdates.batchedUpdates，
+```javascript
+ReactUpdates.batchedUpdates(
+ batchedMountComponentIntoNode,
+ componentInstance,
+ container,
+ shouldReuseMarkup,
+ context,
+);
+```
+[ ReactUpdates](../../renderers/shared/stack/reconciler/ReactUpdates.js#L92)中调用了另一个[batchedUpdates](../../renderers/shared/stack/reconciler/ReactDefaultBatchingStrategy.js#L52)方法。
+```javascript
+batchedUpdates: function(callback, a, b, c, d, e) {
+ var alreadyBatchingUpdates = ReactDefaultBatchingStrategy.isBatchingUpdates;
+ ReactDefaultBatchingStrategy.isBatchingUpdates = true;
+ // The code is written this way to avoid extra allocations
+ if (alreadyBatchingUpdates) {
+    return callback(a, b, c, d, e);
+ } else {
+    return transaction.perform(callback, null, a, b, c, d, e);
+ }
+}
+```
+我们看到alreadyBatchingUpdates 初始为 false ，于是我们进入了 [transaction.perform](../../renderers/shared/stack/reconciler/Transaction.js#L127)
+然后执行回调函数[batchedmountComponentIntoNode](../../renderers/dom/stack/client//ReactMount.js#L142)
+```javascript
+var transaction = ReactUpdates.ReactReconcileTransaction.getPooled(
+  /* useCreateElement */
+  !shouldReuseMarkup && ReactDOMFeatureFlags.useCreateElement,
+);
+```
+在这里我们终于看到useCreateElement。感觉好亲切，有没有

@@ -56,7 +56,7 @@ function ReactUpdatesFlushTransaction() {
   this.reinitializeTransaction();
   this.dirtyComponentsLength = null;
   this.reconcileTransaction = ReactUpdates.ReactReconcileTransaction.getPooled(
-    /* useCreateElement */ true,
+    /* useCreateElement */ true, 
   );
 }
 
